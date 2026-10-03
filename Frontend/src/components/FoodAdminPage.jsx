@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { zenLogo, collegeLogo } from '../assets/logoDataUrl'
 
 import { API_URL } from '../config'
@@ -227,117 +228,132 @@ export default function FoodAdminPage() {
         }
     }
 
-    // Camera Scanner Lifecycle using html5-qrcode
+    // Camera Scanner Lifecycle using statically imported html5-qrcode
     useEffect(() => {
         let isCancelled = false
-        let html5QrCode = null
+
+        const initAndStartCamera = async () => {
+            if (!cameraActive) return
+
+            const qrCodeRegionId = 'reader-food-camera'
+            const el = document.getElementById(qrCodeRegionId)
+            if (!el) return
+
+            const formatsToSupport = [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.UPC_A,
+            ]
+
+            let html5QrCode = null
+            try {
+                // Native hardware BarcodeDetector (backed by Play Services on Android / Vision on iOS)
+                html5QrCode = new Html5Qrcode(qrCodeRegionId, {
+                    formatsToSupport,
+                    verbose: false,
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: true,
+                    },
+                })
+                scannerRef.current = html5QrCode
+            } catch (initErr) {
+                console.error('Html5Qrcode initialization error:', initErr)
+                setStatus({ type: 'error', message: `Camera scanner init error: ${initErr.message || initErr}` })
+                setCameraActive(false)
+                return
+            }
+
+            // Barcode passes are wide horizontal strips: narrow height scan box cuts CPU decoding pixels by 60%!
+            const config = {
+                fps: 25,
+                qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                    width: Math.min(Math.floor(viewfinderWidth * 0.90), 380),
+                    height: Math.min(Math.floor(viewfinderHeight * 0.42), 170),
+                }),
+                aspectRatio: 1.333333,
+                videoConstraints: {
+                    facingMode: { ideal: 'environment' },
+                    width: { min: 640, ideal: 1280, max: 1920 },
+                    height: { min: 480, ideal: 720, max: 1080 },
+                    focusMode: 'continuous',
+                },
+            }
+
+            const onScanSuccess = (decodedText) => {
+                if (!decodedText || isCancelled) return
+                const now = Date.now()
+                // Debounce repeat scans of the same pass within 2.5s
+                if (lastScannedRef.current.code === decodedText && now - lastScannedRef.current.time < 2500) {
+                    return
+                }
+                lastScannedRef.current = { code: decodedText, time: now }
+
+                // Instant haptic feedback for physical scanner feel
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                    try { navigator.vibrate(80) } catch {}
+                }
+
+                handleBarcodeScannedRef.current?.(decodedText)
+            }
+
+            try {
+                let cameraTarget = { facingMode: 'environment' }
+                const devices = await Html5Qrcode.getCameras().catch(() => [])
+                if (devices && devices.length > 0) {
+                    const backCam = devices.find((d) => /back|rear|environment/i.test(d.label))
+                    if (backCam) {
+                        cameraTarget = backCam.id
+                    }
+                }
+
+                if (isCancelled) return
+
+                await html5QrCode.start(cameraTarget, config, onScanSuccess, () => {}).catch(async () => {
+                    if (isCancelled) return
+                    return html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {}).catch(() => {
+                        if (isCancelled) return
+                        return html5QrCode.start(true, config, onScanSuccess, () => {})
+                    })
+                })
+
+                if (isCancelled) {
+                    html5QrCode.stop().catch(() => {})
+                    return
+                }
+
+                // Check if torch / flashlight is supported
+                try {
+                    const caps = html5QrCode.getRunningTrackCameraCapabilities?.()
+                    if (caps?.torchFeature?.()?.isSupported?.()) {
+                        setTorchSupported(true)
+                    } else {
+                        const videoEl = el.querySelector('video')
+                        const track = videoEl?.srcObject?.getVideoTracks?.()?.[0]
+                        if (track?.getCapabilities?.()?.torch) {
+                            setTorchSupported(true)
+                        }
+                    }
+                } catch {
+                    // Capability check fallback
+                }
+            } catch (err) {
+                if (isCancelled) return
+                console.error('Camera start error:', err)
+                let userMsg = err.message || 'Could not access camera.'
+                if (err.name === 'NotAllowedError' || /permission/i.test(err.message || '')) {
+                    userMsg = 'Camera permission was denied. Please allow camera permissions in your browser address bar and try again.'
+                } else if (err.name === 'NotFoundError' || /device not found/i.test(err.message || '')) {
+                    userMsg = 'No camera found on this device.'
+                }
+                setStatus({ type: 'error', message: `Camera error: ${userMsg}` })
+                setCameraActive(false)
+            }
+        }
 
         if (cameraActive) {
-            import('html5-qrcode')
-                .then(async ({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
-                    if (isCancelled) return
-                    const qrCodeRegionId = 'reader-food-camera'
-                    const el = document.getElementById(qrCodeRegionId)
-                    if (!el) return
-
-                    const formatsToSupport = [
-                        Html5QrcodeSupportedFormats.QR_CODE,
-                        Html5QrcodeSupportedFormats.CODE_128,
-                        Html5QrcodeSupportedFormats.CODE_39,
-                        Html5QrcodeSupportedFormats.EAN_13,
-                        Html5QrcodeSupportedFormats.UPC_A,
-                    ]
-
-                    // Native hardware BarcodeDetector (backed by Play Services on Android / Vision on iOS)
-                    html5QrCode = new Html5Qrcode(qrCodeRegionId, {
-                        formatsToSupport,
-                        verbose: false,
-                        experimentalFeatures: {
-                            useBarCodeDetectorIfSupported: true,
-                        },
-                    })
-                    scannerRef.current = html5QrCode
-
-                    // Barcode passes are wide horizontal strips: narrow height scan box cuts CPU decoding pixels by 60%!
-                    const config = {
-                        fps: 25,
-                        qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                            width: Math.min(Math.floor(viewfinderWidth * 0.90), 380),
-                            height: Math.min(Math.floor(viewfinderHeight * 0.42), 170),
-                        }),
-                        aspectRatio: 1.333333,
-                        videoConstraints: {
-                            facingMode: { ideal: 'environment' },
-                            width: { min: 640, ideal: 1280, max: 1920 },
-                            height: { min: 480, ideal: 720, max: 1080 },
-                            focusMode: 'continuous',
-                        },
-                    }
-
-                    const onScanSuccess = (decodedText) => {
-                        if (!decodedText) return
-                        const now = Date.now()
-                        // Debounce repeat scans of the same pass within 2.5s
-                        if (lastScannedRef.current.code === decodedText && now - lastScannedRef.current.time < 2500) {
-                            return
-                        }
-                        lastScannedRef.current = { code: decodedText, time: now }
-
-                        // Instant haptic feedback for physical scanner feel
-                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                            try { navigator.vibrate(80) } catch {}
-                        }
-
-                        handleBarcodeScannedRef.current?.(decodedText)
-                    }
-
-                    try {
-                        let cameraTarget = { facingMode: 'environment' }
-                        const devices = await Html5Qrcode.getCameras().catch(() => [])
-                        if (devices && devices.length > 0) {
-                            const backCam = devices.find((d) => /back|rear|environment/i.test(d.label))
-                            cameraTarget = backCam ? backCam.id : devices[0].id
-                        }
-
-                        await html5QrCode.start(cameraTarget, config, onScanSuccess, () => {}).catch(async () => {
-                            return html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {}).catch(() => {
-                                return html5QrCode.start(true, config, onScanSuccess, () => {})
-                            })
-                        })
-
-                        // Check if torch / flashlight is supported
-                        try {
-                            const caps = html5QrCode.getRunningTrackCameraCapabilities?.()
-                            if (caps?.torchFeature?.()?.isSupported?.()) {
-                                setTorchSupported(true)
-                            } else {
-                                const videoEl = el.querySelector('video')
-                                const track = videoEl?.srcObject?.getVideoTracks?.()?.[0]
-                                if (track?.getCapabilities?.()?.torch) {
-                                    setTorchSupported(true)
-                                }
-                            }
-                        } catch {
-                            // Capability check fallback
-                        }
-                    } catch (err) {
-                        if (isCancelled) return
-                        console.error('Camera start error:', err)
-                        let userMsg = err.message || 'Could not access camera.'
-                        if (err.name === 'NotAllowedError' || /permission/i.test(err.message || '')) {
-                            userMsg = 'Camera permission was denied. Please allow camera permissions in your browser address bar and try again.'
-                        } else if (err.name === 'NotFoundError' || /device not found/i.test(err.message || '')) {
-                            userMsg = 'No camera found on this device.'
-                        }
-                        setStatus({ type: 'error', message: `Camera error: ${userMsg}` })
-                        setCameraActive(false)
-                    }
-                })
-                .catch((err) => {
-                    console.error('Could not load html5-qrcode:', err)
-                    setStatus({ type: 'error', message: 'Could not load camera scanner library.' })
-                    setCameraActive(false)
-                })
+            initAndStartCamera()
         }
 
         return () => {
