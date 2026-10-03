@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
-import { zenLogo, collegeLogo } from '../assets/logoDataUrl'
 
 import { API_URL } from '../config'
 
@@ -439,7 +438,7 @@ export default function FoodAdminPage() {
             if (audioEnabled) sound.playSuccess()
             setStatus({
                 type: 'success',
-                message: `🎉 Food recorded for ${result.participant.participantName}! (${formatDateTime(result.purchase.boughtAt)})`,
+                message: `Food recorded for ${result.participant.participantName}! (${formatDateTime(result.purchase.boughtAt)})`,
             })
 
             // Refresh lookup with new purchase info
@@ -483,13 +482,13 @@ export default function FoodAdminPage() {
                 if (audioEnabled) sound.playWarning()
                 setStatus({
                     type: 'warning',
-                    message: `⚠️ Food ALREADY bought by ${data.participant.participantName} at ${formatDateTime(data.lastBoughtAt)}!`,
+                    message: `Food ALREADY bought by ${data.participant.participantName} at ${formatDateTime(data.lastBoughtAt)}!`,
                 })
             } else {
                 if (audioEnabled) sound.playSuccess()
                 setStatus({
                     type: 'success',
-                    message: `✅ Found eligible participant: ${data.participant.participantName} (${data.participant.passCode})`,
+                    message: `Found eligible participant: ${data.participant.participantName} (${data.participant.passCode})`,
                 })
 
                 // Auto-mark if toggle is active
@@ -651,10 +650,6 @@ export default function FoodAdminPage() {
             {/* Top Navigation & Status Bar */}
             <header className="food-admin-header">
                 <div className="food-header-brand">
-                    <div className="food-header-logos">
-                        <img src={zenLogo} alt="Zen Logo" className="food-brand-logo" />
-                        <img src={collegeLogo} alt="College Logo" className="food-college-logo" />
-                    </div>
                     <div>
                         <div className="food-eyebrow">
                             <span className="pulse-dot"></span>
@@ -671,10 +666,10 @@ export default function FoodAdminPage() {
                         onClick={exportFoodCsv}
                         title="Export Food Log CSV"
                     >
-                        <span>📥</span> Export Food Log
+                        Export Food Log
                     </button>
                     <a href="#admin" className="food-btn food-btn-outline">
-                        <span>📋</span> Reg Admin
+                        Reg Admin
                     </a>
                     <button type="button" className="food-btn food-btn-danger" onClick={logout}>
                         Sign Out
@@ -685,16 +680,16 @@ export default function FoodAdminPage() {
             {/* Mobile Quick Stats Summary Bar */}
             <div className="food-mobile-stat-bar">
                 <div className="mobile-stat-pill">
-                    <span className="stat-pill-label">🍱 Served</span>
+                    <span className="stat-pill-label">Served</span>
                     <strong className="stat-pill-val text-lime">{stats.uniqueParticipantsServed}</strong>
                     <span className="stat-pill-denom">/{stats.totalEligible}</span>
                 </div>
                 <div className="mobile-stat-pill">
-                    <span className="stat-pill-label">⏳ Pending</span>
+                    <span className="stat-pill-label">Pending</span>
                     <strong className="stat-pill-val text-amber">{stats.pending}</strong>
                 </div>
                 <div className="mobile-stat-pill">
-                    <span className="stat-pill-label">⚡ Last Hr</span>
+                    <span className="stat-pill-label">Last Hr</span>
                     <strong className="stat-pill-val text-cyan">{stats.servedInLastHour}</strong>
                 </div>
             </div>
@@ -706,7 +701,6 @@ export default function FoodAdminPage() {
                     className={`food-mobile-tab-btn ${mobileTab === 'scanner' ? 'active' : ''}`}
                     onClick={() => setMobileTab('scanner')}
                 >
-                    <span className="tab-btn-icon">📷</span>
                     <span>Scanner</span>
                 </button>
                 <button
@@ -714,7 +708,6 @@ export default function FoodAdminPage() {
                     className={`food-mobile-tab-btn ${mobileTab === 'search' ? 'active' : ''}`}
                     onClick={() => setMobileTab('search')}
                 >
-                    <span className="tab-btn-icon">🔍</span>
                     <span>Search Student</span>
                 </button>
                 <button
@@ -722,7 +715,6 @@ export default function FoodAdminPage() {
                     className={`food-mobile-tab-btn ${mobileTab === 'log' ? 'active' : ''}`}
                     onClick={() => setMobileTab('log')}
                 >
-                    <span className="tab-btn-icon">📋</span>
                     <span>Food Log {foodRecords.length > 0 ? `(${foodRecords.length})` : ''}</span>
                 </button>
             </nav>
@@ -730,7 +722,7 @@ export default function FoodAdminPage() {
             {/* KPI Stats Grid (Visible on desktop; on mobile only inside the 'log' tab) */}
             <section className={`food-stats-grid ${mobileTab !== 'log' ? 'hide-mobile' : ''}`}>
                 <div className="food-stat-card card-served">
-                    <span className="food-stat-label">🍱 FOOD BOUGHT / SERVED</span>
+                    <span className="food-stat-label">FOOD BOUGHT / SERVED</span>
                     <div className="food-stat-val text-lime">
                         {stats.uniqueParticipantsServed}
                         <small className="stat-denom">/ {stats.totalEligible}</small>
@@ -741,19 +733,19 @@ export default function FoodAdminPage() {
                 </div>
 
                 <div className="food-stat-card card-pending">
-                    <span className="food-stat-label">⏳ PENDING MEALS</span>
+                    <span className="food-stat-label">PENDING MEALS</span>
                     <div className="food-stat-val text-amber">{stats.pending}</div>
                     <span className="food-stat-sub">Students yet to claim food</span>
                 </div>
 
                 <div className="food-stat-card card-recent">
-                    <span className="food-stat-label">⚡ LAST 60 MINUTES</span>
+                    <span className="food-stat-label">LAST 60 MINUTES</span>
                     <div className="food-stat-val text-cyan">{stats.servedInLastHour}</div>
                     <span className="food-stat-sub">Recent peak counter activity</span>
                 </div>
 
                 <div className="food-stat-card card-total">
-                    <span className="food-stat-label">👥 TOTAL REGISTERED</span>
+                    <span className="food-stat-label">TOTAL REGISTERED</span>
                     <div className="food-stat-val text-ink">{stats.totalEligible}</div>
                     <span className="food-stat-sub">Individuals + Team Members</span>
                 </div>
@@ -767,7 +759,6 @@ export default function FoodAdminPage() {
                         className={`scanner-toggle-btn ${cameraActive ? 'active' : ''}`}
                         onClick={() => setCameraActive(!cameraActive)}
                     >
-                        <span>📷</span>
                         {cameraActive ? 'Close Camera Scanner' : 'Open Camera Scanner'}
                     </button>
 
@@ -778,7 +769,7 @@ export default function FoodAdminPage() {
                             onChange={(e) => setAutoMarkOnScan(e.target.checked)}
                         />
                         <span className="toggle-slider"></span>
-                        <span className="toggle-text">⚡ Auto-mark as bought on scan</span>
+                        <span className="toggle-text">Auto-mark as bought on scan</span>
                     </label>
 
                     <label className="toolbar-toggle-label">
@@ -788,17 +779,21 @@ export default function FoodAdminPage() {
                             onChange={(e) => setAudioEnabled(e.target.checked)}
                         />
                         <span className="toggle-slider"></span>
-                        <span className="toggle-text">🔊 Sound feedback</span>
+                        <span className="toggle-text">Sound feedback</span>
                     </label>
                 </div>
 
                 <div className="toolbar-right">
                     <button
                         type="button"
-                        className="food-btn food-btn-sm"
+                        className="food-btn food-btn-sm food-refresh-btn"
                         onClick={loadRecordsAndStats}
+                        title="Reload records and stats"
                     >
-                        🔄 Refresh Data
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                        </svg>
+                        Refresh Data
                     </button>
                 </div>
             </section>
@@ -822,7 +817,12 @@ export default function FoodAdminPage() {
                             className="food-open-camera-hero-btn"
                             onClick={() => setCameraActive(true)}
                         >
-                            <span className="hero-btn-icon">📷</span>
+                            <span className="hero-btn-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                </svg>
+                            </span>
                             <div className="hero-btn-text">
                                 <strong>Open Camera Scanner</strong>
                                 <span>Tap to scan Code 128 / QR badge instantly</span>
@@ -847,7 +847,7 @@ export default function FoodAdminPage() {
                                             onClick={toggleTorch}
                                             title="Toggle Flashlight"
                                         >
-                                            {torchOn ? '🔦 Flashlight ON' : '💡 Flashlight'}
+                                            {torchOn ? 'Flashlight ON' : 'Flashlight'}
                                         </button>
                                     )}
                                     <button
@@ -873,7 +873,7 @@ export default function FoodAdminPage() {
                                     <span className="camera-target-hint">Hold barcode horizontally inside the box</span>
                                 </div>
                             </div>
-                            <p className="camera-hint">⚡ Hardware-accelerated scanning enabled</p>
+                            <p className="camera-hint">Hardware-accelerated scanning enabled</p>
                         </div>
                     )}
 
@@ -933,7 +933,13 @@ export default function FoodAdminPage() {
                             <div className="result-header-banner">
                                 {currentLookup.alreadyBought ? (
                                     <div className="banner-content warning-banner">
-                                        <span className="banner-icon">⚠️</span>
+                                        <span className="banner-icon" aria-hidden="true">
+                                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd166" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                            </svg>
+                                        </span>
                                         <div>
                                             <div className="banner-title">FOOD ALREADY BOUGHT!</div>
                                             <div className="banner-subtitle">
@@ -943,7 +949,11 @@ export default function FoodAdminPage() {
                                     </div>
                                 ) : (
                                     <div className="banner-content success-banner">
-                                        <span className="banner-icon">✅</span>
+                                        <span className="banner-icon" aria-hidden="true">
+                                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"/>
+                                            </svg>
+                                        </span>
                                         <div>
                                             <div className="banner-title">ELIGIBLE FOR FOOD</div>
                                             <div className="banner-subtitle">
@@ -1004,7 +1014,7 @@ export default function FoodAdminPage() {
                             {currentLookup.alreadyBought && currentLookup.purchases?.length > 0 && (
                                 <div className="purchase-timestamps-box">
                                     <div className="timestamps-box-header">
-                                        <span>🕒 WHEN THEY BOUGHT THE FOOD</span>
+                                        <span>WHEN THEY BOUGHT THE FOOD</span>
                                         <span className="tokens-count-badge">
                                             {currentLookup.purchaseCount} {currentLookup.purchaseCount === 1 ? 'Token' : 'Tokens'} Issued
                                         </span>
@@ -1069,7 +1079,7 @@ export default function FoodAdminPage() {
                                             disabled={isPurchasing}
                                             onClick={() => recordFoodPurchase(currentLookup.participant.passCode, false)}
                                         >
-                                            {isPurchasing ? 'Recording...' : '🍱 Confirm & Mark as Bought'}
+                                            {isPurchasing ? 'Recording...' : 'Confirm & Mark as Bought'}
                                         </button>
                                     ) : (
                                         <button
@@ -1082,7 +1092,7 @@ export default function FoodAdminPage() {
                                                 }
                                             }}
                                         >
-                                            {isPurchasing ? 'Recording...' : '⚠️ Issue Additional Meal (Override)'}
+                                            {isPurchasing ? 'Recording...' : 'Issue Additional Meal (Override)'}
                                         </button>
                                     )}
 
@@ -1101,7 +1111,12 @@ export default function FoodAdminPage() {
                         </div>
                     ) : (
                         <div className="food-scanner-placeholder">
-                            <div className="placeholder-icon">⚡</div>
+                            <div className="placeholder-icon" aria-hidden="true">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+                                    <line x1="7" y1="12" x2="17" y2="12"/>
+                                </svg>
+                            </div>
                             <h3>Scanner Ready</h3>
                             <p>
                                 Scan any participant's barcode pass or type their pass code above.
@@ -1116,7 +1131,7 @@ export default function FoodAdminPage() {
                     {/* Manual Search Card (For students without barcode) */}
                     <div className={`food-manual-search-card ${mobileTab !== 'search' ? 'hide-mobile' : ''}`}>
                         <div className="manual-search-header">
-                            <span>🔍 LOST BARCODE? SEARCH PARTICIPANT</span>
+                            <span>LOST BARCODE? SEARCH PARTICIPANT</span>
                         </div>
                         <input
                             type="search"
@@ -1264,8 +1279,22 @@ export default function FoodAdminPage() {
                         {/* Modal Header */}
                         <div className="modal-header-bar">
                             <div className="modal-header-title">
-                                <span className="modal-header-icon">
-                                    {justPurchased ? '🎉' : currentLookup.alreadyBought ? '⚠️' : '✅'}
+                                <span className="modal-header-icon" aria-hidden="true">
+                                    {justPurchased ? (
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                    ) : currentLookup.alreadyBought ? (
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd166" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                                            <line x1="12" y1="9" x2="12" y2="13"/>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                        </svg>
+                                    ) : (
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                    )}
                                 </span>
                                 <div>
                                     <h2 className="modal-title">
@@ -1304,7 +1333,7 @@ export default function FoodAdminPage() {
                                         {currentLookup.participant.passCode} · {currentLookup.participant.college || 'Annapoorana Engineering College'}
                                     </p>
                                     <div className="success-meal-pill">
-                                        🍱 {foodType} Issued Successfully
+                                        {foodType} Issued Successfully
                                     </div>
                                     <button
                                         type="button"
@@ -1358,7 +1387,7 @@ export default function FoodAdminPage() {
                                     {currentLookup.alreadyBought && currentLookup.purchases?.length > 0 && (
                                         <div className="modal-timestamps-card">
                                             <div className="modal-timestamps-head">
-                                                <span>🕒 Past Meal Claims ({currentLookup.purchaseCount} Token{currentLookup.purchaseCount === 1 ? '' : 's'})</span>
+                                                <span>Past Meal Claims ({currentLookup.purchaseCount} Token{currentLookup.purchaseCount === 1 ? '' : 's'})</span>
                                             </div>
                                             <div className="modal-timestamps-list">
                                                 {currentLookup.purchases.map((p, idx) => (
@@ -1408,7 +1437,7 @@ export default function FoodAdminPage() {
                                                 disabled={isPurchasing}
                                                 onClick={() => recordFoodPurchase(currentLookup.participant.passCode, false)}
                                             >
-                                                {isPurchasing ? 'Recording...' : '🍱 Confirm & Mark as Bought'}
+                                                {isPurchasing ? 'Recording...' : 'Confirm & Mark as Bought'}
                                             </button>
                                         ) : (
                                             <button
@@ -1421,7 +1450,7 @@ export default function FoodAdminPage() {
                                                     }
                                                 }}
                                             >
-                                                {isPurchasing ? 'Recording...' : '⚠️ Issue Additional Meal (Override)'}
+                                                {isPurchasing ? 'Recording...' : 'Issue Additional Meal (Override)'}
                                             </button>
                                         )}
 

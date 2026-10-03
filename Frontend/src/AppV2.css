@@ -4323,7 +4323,15 @@ footer h2 {
     cursor: pointer;
     text-decoration: none;
     transition: all .2s ease;
-    border: 1px solid transparent;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, .05);
+    color: var(--ink);
+}
+
+.food-btn:hover {
+    background: rgba(255, 255, 255, .1);
+    border-color: rgba(255, 255, 255, .25);
+    color: var(--ink);
 }
 
 .food-btn-outline {
@@ -4347,6 +4355,24 @@ footer h2 {
 .food-btn-danger:hover {
     background: rgba(255, 79, 154, .25);
     color: #fff;
+}
+
+.food-refresh-btn {
+    background: rgba(213, 255, 75, .08);
+    border: 1px solid rgba(213, 255, 75, .3);
+    color: var(--lime);
+    font-weight: 600;
+}
+
+.food-refresh-btn:hover {
+    background: rgba(213, 255, 75, .18);
+    border-color: var(--lime);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(213, 255, 75, .22);
+}
+
+.food-refresh-btn:active {
+    transform: scale(0.97);
 }
 
 .food-btn-sm {
