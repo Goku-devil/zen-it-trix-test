@@ -1407,7 +1407,7 @@ export default function FoodAdminPage() {
                                         {justPurchased
                                             ? 'Meal token saved in live log'
                                             : currentLookup.alreadyBought
-                                            ? `Already claimed at ${formatDateTime(currentLookup.lastBoughtAt)} (${getRelativeTime(currentLookup.lastBoughtAt)})`
+                                            ? 'Participant already claimed food'
                                             : 'Eligible participant · Ready to issue token'}
                                     </span>
                                 </div>
@@ -1441,6 +1441,56 @@ export default function FoodAdminPage() {
                                         autoFocus
                                     >
                                         Scan Next Participant →
+                                    </button>
+                                </div>
+                            ) : currentLookup.alreadyBought ? (
+                                <div className="modal-already-bought-minimal">
+                                    <div className="minimal-bought-badge">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                                            <line x1="12" y1="9" x2="12" y2="13"/>
+                                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                        </svg>
+                                        ALREADY CLAIMED
+                                    </div>
+
+                                    <div>
+                                        <h3 className="minimal-bought-name">{currentLookup.participant.participantName}</h3>
+                                        <span className="minimal-bought-pass">{currentLookup.participant.passCode}</span>
+                                    </div>
+
+                                    <div className="minimal-bought-status-box">
+                                        <span className="minimal-status-title">Meal Already Issued</span>
+                                        <span className="minimal-status-time">
+                                            {formatDateTime(currentLookup.lastBoughtAt)} ({getRelativeTime(currentLookup.lastBoughtAt)})
+                                        </span>
+                                        {currentLookup.purchases?.[0]?.foodType && (
+                                            <span className="minimal-status-meal">
+                                                Meal: {currentLookup.purchases[0].foodType}
+                                                {currentLookup.purchaseCount > 1 ? ` · ${currentLookup.purchaseCount} tokens issued` : ''}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="modal-next-btn-large"
+                                        onClick={closeModal}
+                                        autoFocus
+                                    >
+                                        Scan Next Participant →
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="minimal-override-link"
+                                        onClick={() => {
+                                            if (window.confirm(`Participant already bought food at ${formatDateTime(currentLookup.lastBoughtAt)}. Are you sure you want to issue an extra food token?`)) {
+                                                recordFoodPurchase(currentLookup.participant.passCode, true)
+                                            }
+                                        }}
+                                    >
+                                        Issue Extra Meal (Override)
                                     </button>
                                 </div>
                             ) : (
@@ -1482,26 +1532,6 @@ export default function FoodAdminPage() {
                                         </div>
                                     </div>
 
-                                    {/* Past Purchase Details (if already claimed) */}
-                                    {currentLookup.alreadyBought && currentLookup.purchases?.length > 0 && (
-                                        <div className="modal-timestamps-card">
-                                            <div className="modal-timestamps-head">
-                                                <span>Past Meal Claims ({currentLookup.purchaseCount} Token{currentLookup.purchaseCount === 1 ? '' : 's'})</span>
-                                            </div>
-                                            <div className="modal-timestamps-list">
-                                                {currentLookup.purchases.map((p, idx) => (
-                                                    <div key={p.id || idx} className="modal-timestamp-item">
-                                                        <div className="modal-ts-left">
-                                                            <strong className="modal-ts-time">{formatDateTime(p.boughtAt)}</strong>
-                                                            <span className="modal-ts-rel">({getRelativeTime(p.boughtAt)})</span>
-                                                        </div>
-                                                        <span className="modal-ts-tag">{p.foodType}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* Meal Selection Selector */}
                                     <div className="modal-meal-controls">
                                         <label className="modal-meal-label">
@@ -1529,29 +1559,14 @@ export default function FoodAdminPage() {
 
                                     {/* Action Buttons */}
                                     <div className="modal-actions-bar">
-                                        {!currentLookup.alreadyBought ? (
-                                            <button
-                                                type="button"
-                                                className="modal-action-btn btn-confirm"
-                                                disabled={isPurchasing}
-                                                onClick={() => recordFoodPurchase(currentLookup.participant.passCode, false)}
-                                            >
-                                                {isPurchasing ? 'Recording...' : 'Confirm & Mark as Bought'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                className="modal-action-btn btn-override"
-                                                disabled={isPurchasing}
-                                                onClick={() => {
-                                                    if (window.confirm(`Participant already bought food at ${formatDateTime(currentLookup.lastBoughtAt)}. Are you sure you want to issue an extra token?`)) {
-                                                        recordFoodPurchase(currentLookup.participant.passCode, true)
-                                                    }
-                                                }}
-                                            >
-                                                {isPurchasing ? 'Recording...' : 'Issue Additional Meal (Override)'}
-                                            </button>
-                                        )}
+                                        <button
+                                            type="button"
+                                            className="modal-action-btn btn-confirm"
+                                            disabled={isPurchasing}
+                                            onClick={() => recordFoodPurchase(currentLookup.participant.passCode, false)}
+                                        >
+                                            {isPurchasing ? 'Recording...' : 'Confirm & Mark as Bought'}
+                                        </button>
 
                                         <button
                                             type="button"

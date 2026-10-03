@@ -6342,6 +6342,96 @@ footer h2 {
     filter: brightness(1.1);
 }
 
+/* Minimal Already Bought Modal Card */
+.modal-already-bought-minimal {
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+}
+
+.minimal-bought-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    background: rgba(255, 183, 3, 0.14);
+    border: 1px solid rgba(255, 183, 3, 0.35);
+    color: #ffd166;
+    font: 700 12px 'DM Mono', monospace;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.minimal-bought-name {
+    margin: 0 0 6px;
+    font-size: clamp(22px, 4vw, 28px);
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+}
+
+.minimal-bought-pass {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--line);
+    color: var(--lime);
+    font: 700 13px 'DM Mono', monospace;
+    letter-spacing: .04em;
+}
+
+.minimal-bought-status-box {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255, 183, 3, 0.08);
+    border: 1px solid rgba(255, 183, 3, 0.25);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+}
+
+.minimal-status-title {
+    font: 700 13px 'Space Grotesk', sans-serif;
+    color: #ffd166;
+    letter-spacing: .02em;
+}
+
+.minimal-status-time {
+    font: 500 13px 'DM Mono', monospace;
+    color: var(--ink);
+    opacity: 0.95;
+}
+
+.minimal-status-meal {
+    font: 600 11px 'DM Mono', monospace;
+    color: var(--muted);
+}
+
+.minimal-override-link {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font: 500 11px 'DM Mono', monospace;
+    cursor: pointer;
+    text-decoration: underline;
+    opacity: 0.75;
+    padding: 6px;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.minimal-override-link:hover {
+    opacity: 1;
+    color: #ffd166;
+}
+
 @media (max-width: 600px) {
     .food-modal-card {
         max-height: 94vh;
