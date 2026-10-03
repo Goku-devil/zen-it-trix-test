@@ -17,7 +17,7 @@ function IntroStrip() {
 }
 
 function App() {
-    const [theme, setTheme] = useState(() => localStorage.getItem('zen-theme') || 'terminal')
+    const [theme, setTheme] = useState(() => localStorage.getItem('zen-theme') || 'default')
     const [registration, setRegistration] = useState(null)
     const [hash, setHash] = useState(() => window.location.hash)
 
