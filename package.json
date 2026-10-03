@@ -1,0 +1,7 @@
+{
+  "name": "zen-it-trix-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix Frontend install && npm --prefix Frontend run build"
+  }
+}
