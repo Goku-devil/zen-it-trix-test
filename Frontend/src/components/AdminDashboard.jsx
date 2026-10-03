@@ -3,7 +3,8 @@ import { getEventConfig, getFilteredEvents, nonTechnicalEvents, technicalEvents,
 import { zenLogo, collegeLogo } from '../assets/logoDataUrl'
 import CollegeSelector from './CollegeSelector'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+import { API_URL } from '../config'
+
 const PHONE_REGEX = /^[6-9]\d{9}$/
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

@@ -20,26 +20,76 @@ const foodUsername = process.env.FOOD_ADMIN_USERNAME || 'foodadmin'
 const foodPassword = process.env.FOOD_ADMIN_PASSWORD || 'food@zen-ti-trix-2'
 const adminSessions = new Map()
 
-const pool = mariadb.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || 'zen_it_trix_db',
-    password: process.env.DB_PASSWORD || 'root',
-    database: process.env.DB_NAME || 'zen_it_trix',
-    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
-})
+const parseDbConfig = () => {
+    let host = process.env.DB_HOST || 'localhost'
+    let port = Number(process.env.DB_PORT || 3306)
+    let user = process.env.DB_USER || 'zen_it_trix_db'
+    let password = process.env.DB_PASSWORD || 'root'
+    let database = process.env.DB_NAME || 'zen_it_trix'
+
+    if (process.env.DATABASE_URL) {
+        try {
+            const dbUrl = new URL(process.env.DATABASE_URL)
+            host = dbUrl.hostname || host
+            port = dbUrl.port ? Number(dbUrl.port) : port
+            user = dbUrl.username ? decodeURIComponent(dbUrl.username) : user
+            password = dbUrl.password ? decodeURIComponent(dbUrl.password) : password
+            database = dbUrl.pathname.replace(/^\//, '') || database
+        } catch (err) {
+            console.warn('Failed to parse DATABASE_URL, falling back to individual env variables.', err.message)
+        }
+    }
+
+    const useSsl =
+        process.env.DB_SSL === 'true' ||
+        process.env.DB_SSL === '1' ||
+        (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('ssl-mode='))
+
+    const sslConfig = useSsl
+        ? (process.env.DB_CA_CERT ? { ca: process.env.DB_CA_CERT, rejectUnauthorized: true } : { rejectUnauthorized: false })
+        : undefined
+
+    return {
+        host,
+        port,
+        user,
+        password,
+        database,
+        connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
+        ...(sslConfig ? { ssl: sslConfig } : {}),
+    }
+}
+
+const pool = mariadb.createPool(parseDbConfig())
+
+const configuredOrigins = (process.env.FRONTEND_ORIGIN || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
 
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true)
-        const allowed = [
+        const defaultAllowed = [
             'http://localhost:5173',
             'http://127.0.0.1:5173',
             'http://localhost:8080',
             'http://127.0.0.1:8080',
-            allowedOriginEnv,
         ]
-        if (allowed.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        const isPagesDev = (() => {
+            try {
+                return /\.pages\.dev$/.test(new URL(origin).hostname)
+            } catch {
+                return false
+            }
+        })()
+        if (
+            defaultAllowed.includes(origin) ||
+            configuredOrigins.includes(origin) ||
+            origin.startsWith('http://localhost:') ||
+            origin.startsWith('http://127.0.0.1:') ||
+            isPagesDev
+        ) {
             return callback(null, true)
         }
         return callback(null, true)
@@ -135,17 +185,63 @@ const migratePassCodes = async () => {
     )
 }
 
+const ensureColumn = async (tableName, columnName, columnDefinition) => {
+    try {
+        const rows = await pool.query(
+            `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS 
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+            [tableName, columnName]
+        )
+        if (Number(rows[0]?.cnt || 0) === 0) {
+            await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${columnDefinition}`)
+        }
+    } catch (err) {
+        console.warn(`Could not check or add column ${columnName} to ${tableName}:`, err.message)
+    }
+}
+
 const ensureSchema = async () => {
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS present TINYINT(1) NOT NULL DEFAULT 0')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS present_at TIMESTAMP NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS year_of_study VARCHAR(30) NOT NULL DEFAULT "1st Year"')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS college_id VARCHAR(60) NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS registration_type VARCHAR(20) NOT NULL DEFAULT "individual"')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS team_name VARCHAR(120) NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS technical_event VARCHAR(120) NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS non_technical_event VARCHAR(120) NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations ADD COLUMN IF NOT EXISTS pass_code VARCHAR(30) NULL DEFAULT NULL')
-    await pool.query('ALTER TABLE registrations MODIFY COLUMN event_name VARCHAR(255) NOT NULL')
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS registrations (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            full_name VARCHAR(120) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            phone VARCHAR(30) NOT NULL,
+            college VARCHAR(180) NOT NULL,
+            college_id VARCHAR(60) NULL DEFAULT NULL,
+            year_of_study VARCHAR(30) NOT NULL DEFAULT '1st Year',
+            event_name VARCHAR(255) NOT NULL,
+            technical_event VARCHAR(120) NULL DEFAULT NULL,
+            non_technical_event VARCHAR(120) NULL DEFAULT NULL,
+            registration_type VARCHAR(20) NOT NULL DEFAULT 'individual',
+            team_name VARCHAR(120) NULL DEFAULT NULL,
+            team_size TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            pass_code VARCHAR(30) NULL DEFAULT NULL,
+            present TINYINT(1) NOT NULL DEFAULT 0,
+            present_at TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_event_registration (email, event_name),
+            INDEX registrations_created_at_idx (created_at)
+        )
+    `)
+
+    await ensureColumn('registrations', 'present', 'TINYINT(1) NOT NULL DEFAULT 0')
+    await ensureColumn('registrations', 'present_at', 'TIMESTAMP NULL DEFAULT NULL')
+    await ensureColumn('registrations', 'year_of_study', 'VARCHAR(30) NOT NULL DEFAULT "1st Year"')
+    await ensureColumn('registrations', 'college_id', 'VARCHAR(60) NULL DEFAULT NULL')
+    await ensureColumn('registrations', 'registration_type', 'VARCHAR(20) NOT NULL DEFAULT "individual"')
+    await ensureColumn('registrations', 'team_name', 'VARCHAR(120) NULL DEFAULT NULL')
+    await ensureColumn('registrations', 'technical_event', 'VARCHAR(120) NULL DEFAULT NULL')
+    await ensureColumn('registrations', 'non_technical_event', 'VARCHAR(120) NULL DEFAULT NULL')
+    await ensureColumn('registrations', 'pass_code', 'VARCHAR(30) NULL DEFAULT NULL')
+
+    try {
+        await pool.query('ALTER TABLE registrations MODIFY COLUMN event_name VARCHAR(255) NOT NULL')
+    } catch {
+        // Best effort column modify
+    }
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS team_members (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -159,7 +255,8 @@ const ensureSchema = async () => {
             CONSTRAINT fk_team_members_registration FOREIGN KEY (registration_id) REFERENCES registrations(id) ON DELETE CASCADE
         )
     `)
-    await pool.query('ALTER TABLE team_members ADD COLUMN IF NOT EXISTS pass_code VARCHAR(30) NULL DEFAULT NULL')
+    await ensureColumn('team_members', 'pass_code', 'VARCHAR(30) NULL DEFAULT NULL')
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS pass_counters (
             counter_type VARCHAR(20) NOT NULL PRIMARY KEY,
@@ -1038,7 +1135,7 @@ app.get('/api/food/search-participants', requireAdmin, async (request, response)
 app.use((_request, response) => response.status(404).json({ message: 'Route not found.' }))
 
 ensureSchema()
-    .then(() => app.listen(port, () => console.log(`Zen-it-trix API listening on http://localhost:${port}`)))
+    .then(() => app.listen(port, '0.0.0.0', () => console.log(`Zen-it-trix API listening on port ${port}`)))
     .catch((error) => {
         console.error('Could not prepare database schema.', error)
         process.exitCode = 1

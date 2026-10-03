@@ -3,7 +3,8 @@ import { nonTechnicalEvents, technicalEvents, yearsOfStudy, getEventConfig, getF
 import { zenLogo, collegeLogo } from '../assets/logoDataUrl'
 import CollegeSelector from './CollegeSelector'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+import { API_URL } from '../config'
+
 const emptyForm = { fullName: '', email: '', phone: '', college: '', yearOfStudy: '1st Year', technicalEvent: '', nonTechnicalEvent: '', teamName: '', teamSize: '2' }
 const escapeHtml = (value) => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
 const themedPassStyles = `@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');

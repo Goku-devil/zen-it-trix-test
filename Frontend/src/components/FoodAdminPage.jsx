@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { zenLogo, collegeLogo } from '../assets/logoDataUrl'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+import { API_URL } from '../config'
 
 // Audio feedback using Web Audio API
 class SoundPlayer {
