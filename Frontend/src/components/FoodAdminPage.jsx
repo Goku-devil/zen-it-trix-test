@@ -211,52 +211,85 @@ export default function FoodAdminPage() {
 
     // Camera Scanner Lifecycle using html5-qrcode
     useEffect(() => {
+        let isCancelled = false
         let html5QrCode = null
+
         if (cameraActive) {
             import('html5-qrcode')
-                .then(({ Html5Qrcode }) => {
+                .then(async ({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
+                    if (isCancelled) return
                     const qrCodeRegionId = 'reader-food-camera'
                     const el = document.getElementById(qrCodeRegionId)
                     if (!el) return
 
-                    html5QrCode = new Html5Qrcode(qrCodeRegionId)
+                    const formatsToSupport = [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                    ]
+
+                    html5QrCode = new Html5Qrcode(qrCodeRegionId, { formatsToSupport, verbose: false })
                     scannerRef.current = html5QrCode
 
                     const config = {
-                        fps: 10,
-                        qrbox: { width: 280, height: 180 },
+                        fps: 15,
+                        qrbox: (viewfinderWidth, viewfinderHeight) => ({
+                            width: Math.min(Math.floor(viewfinderWidth * 0.85), 320),
+                            height: Math.min(Math.floor(viewfinderHeight * 0.55), 180),
+                        }),
                         aspectRatio: 1.777778,
                     }
 
-                    html5QrCode
-                        .start(
-                            { facingMode: 'environment' },
-                            config,
-                            (decodedText) => {
-                                if (decodedText) {
-                                    handleBarcodeScannedRef.current?.(decodedText)
-                                }
-                            },
-                            () => {
-                                // Scanning in progress
-                            }
-                        )
-                        .catch((err) => {
-                            console.error('Camera start error:', err)
-                            setStatus({ type: 'error', message: `Camera error: ${err.message || 'Could not access camera.'}` })
-                            setCameraActive(false)
+                    const onScanSuccess = (decodedText) => {
+                        if (decodedText) {
+                            handleBarcodeScannedRef.current?.(decodedText)
+                        }
+                    }
+
+                    try {
+                        let cameraTarget = { facingMode: 'environment' }
+                        const devices = await Html5Qrcode.getCameras().catch(() => [])
+                        if (devices && devices.length > 0) {
+                            const backCam = devices.find((d) => /back|rear|environment/i.test(d.label))
+                            cameraTarget = backCam ? backCam.id : devices[0].id
+                        }
+
+                        await html5QrCode.start(cameraTarget, config, onScanSuccess, () => {}).catch(async () => {
+                            return html5QrCode.start({ facingMode: 'user' }, config, onScanSuccess, () => {}).catch(() => {
+                                return html5QrCode.start(true, config, onScanSuccess, () => {})
+                            })
                         })
+                    } catch (err) {
+                        if (isCancelled) return
+                        console.error('Camera start error:', err)
+                        let userMsg = err.message || 'Could not access camera.'
+                        if (err.name === 'NotAllowedError' || /permission/i.test(err.message || '')) {
+                            userMsg = 'Camera permission was denied. Please allow camera permissions in your browser address bar and try again.'
+                        } else if (err.name === 'NotFoundError' || /device not found/i.test(err.message || '')) {
+                            userMsg = 'No camera found on this device.'
+                        }
+                        setStatus({ type: 'error', message: `Camera error: ${userMsg}` })
+                        setCameraActive(false)
+                    }
                 })
                 .catch((err) => {
                     console.error('Could not load html5-qrcode:', err)
+                    setStatus({ type: 'error', message: 'Could not load camera scanner library.' })
+                    setCameraActive(false)
                 })
         }
 
         return () => {
+            isCancelled = true
             if (scannerRef.current) {
-                scannerRef.current.stop().catch(() => {}).finally(() => {
-                    scannerRef.current = null
-                })
+                scannerRef.current
+                    .stop()
+                    .catch(() => {})
+                    .finally(() => {
+                        scannerRef.current = null
+                    })
             }
         }
     }, [cameraActive])
@@ -287,10 +320,51 @@ export default function FoodAdminPage() {
         setCurrentLookup(null)
     }
 
+    // Record food purchase
+    const recordFoodPurchase = async (passCode, force = false) => {
+        setIsPurchasing(true)
+        try {
+            const result = await request('/food/purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    passCode,
+                    foodType,
+                    notes,
+                    force,
+                }),
+            })
+
+            if (audioEnabled) sound.playSuccess()
+            setStatus({
+                type: 'success',
+                message: `🎉 Food recorded for ${result.participant.participantName}! (${formatDateTime(result.purchase.boughtAt)})`,
+            })
+
+            // Refresh lookup with new purchase info
+            const updated = await request(`/food/lookup/${encodeURIComponent(passCode)}`)
+            setCurrentLookup(updated)
+            loadRecordsAndStats()
+            setNotes('')
+        } catch (error) {
+            if (audioEnabled) sound.playError()
+            setStatus({ type: 'error', message: error.message || 'Could not record food purchase.' })
+        } finally {
+            setIsPurchasing(false)
+            if (inputRef.current) inputRef.current.focus()
+        }
+    }
+
     // Lookup pass code
     const handleBarcodeScanned = async (codeToSearch) => {
-        const clean = String(codeToSearch || '').trim()
+        let clean = String(codeToSearch || '').trim()
         if (!clean) return
+
+        // Extract code if a full URL or hash was scanned (e.g. https://...#ZEN-I-001)
+        const urlMatch = clean.match(/(?:pass|barcode|code=|[#\/])([A-Za-z0-9\-_]+)$/i)
+        if (urlMatch && (urlMatch[1].toUpperCase().includes('ZEN') || /^\d+$/.test(urlMatch[1]))) {
+            clean = urlMatch[1]
+        }
 
         setIsSearching(true)
         setStatus({ type: '', message: '' })
@@ -335,41 +409,6 @@ export default function FoodAdminPage() {
     const handleFormSubmit = (e) => {
         e.preventDefault()
         handleBarcodeScanned(passCodeInput)
-    }
-
-    // Record food purchase
-    const recordFoodPurchase = async (passCode, force = false) => {
-        setIsPurchasing(true)
-        try {
-            const result = await request('/food/purchase', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    passCode,
-                    foodType,
-                    notes,
-                    force,
-                }),
-            })
-
-            if (audioEnabled) sound.playSuccess()
-            setStatus({
-                type: 'success',
-                message: `🎉 Food recorded for ${result.participant.participantName}! (${formatDateTime(result.purchase.boughtAt)})`,
-            })
-
-            // Refresh lookup with new purchase info
-            const updated = await request(`/food/lookup/${encodeURIComponent(passCode)}`)
-            setCurrentLookup(updated)
-            loadRecordsAndStats()
-            setNotes('')
-        } catch (error) {
-            if (audioEnabled) sound.playError()
-            setStatus({ type: 'error', message: error.message || 'Could not record food purchase.' })
-        } finally {
-            setIsPurchasing(false)
-            if (inputRef.current) inputRef.current.focus()
-        }
     }
 
     // Delete/Undo food purchase

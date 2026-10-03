@@ -11,6 +11,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: path.resolve(__dirname, '../.env') })
 dotenv.config()
 
+BigInt.prototype.toJSON = function () {
+    return Number(this)
+}
+
 const app = express()
 const port = Number(process.env.PORT || 4000)
 const allowedOriginEnv = process.env.FRONTEND_ORIGIN || 'http://localhost:5173'
@@ -86,6 +90,7 @@ const parseDbConfig = () => {
         connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
         connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT || 15000), // 15 seconds (default was only 1000ms)
         acquireTimeout: Number(process.env.DB_ACQUIRE_TIMEOUT || 20000),
+        bigIntAsNumber: true,
         ...(sslConfig ? { ssl: sslConfig } : {}),
     }
 }
@@ -813,9 +818,26 @@ const formatFoodRecord = (record) => {
     }
 }
 
+const sanitizeParticipant = (row) => {
+    if (!row) return null
+    return {
+        ...row,
+        memberId: row.memberId != null ? Number(row.memberId) : null,
+        memberOrder: row.memberOrder != null ? Number(row.memberOrder) : 1,
+        registrationId: Number(row.registrationId),
+        teamSize: row.teamSize != null ? Number(row.teamSize) : 1,
+        present: row.present != null ? Number(row.present) : 0,
+    }
+}
+
 const findParticipantByPassCode = async (rawCode) => {
     if (!rawCode) return null
-    const cleanCode = String(rawCode).trim()
+    let cleanCode = String(rawCode).trim()
+    // Extract code if a full URL or hash was scanned (e.g. https://...#ZEN-I-001)
+    const urlMatch = cleanCode.match(/(?:pass|barcode|code=|[#\/])([A-Za-z0-9\-_]+)$/i)
+    if (urlMatch && (urlMatch[1].toUpperCase().includes('ZEN') || /^\d+$/.test(urlMatch[1]))) {
+        cleanCode = urlMatch[1]
+    }
     const upperCode = cleanCode.toUpperCase()
 
     // 1. Check team_members
@@ -831,7 +853,7 @@ const findParticipantByPassCode = async (rawCode) => {
         [upperCode, cleanCode]
     )
     if (memberRows.length > 0) {
-        return memberRows[0]
+        return sanitizeParticipant(memberRows[0])
     }
 
     // 2. Check registrations
@@ -846,7 +868,7 @@ const findParticipantByPassCode = async (rawCode) => {
         [upperCode, cleanCode]
     )
     if (regRows.length > 0) {
-        return regRows[0]
+        return sanitizeParticipant(regRows[0])
     }
 
     // 3. Fallback: Numeric ID match in registrations
@@ -861,7 +883,7 @@ const findParticipantByPassCode = async (rawCode) => {
              WHERE r.id = ?`,
             [Number(cleanCode)]
         )
-        if (idRows.length > 0) return idRows[0]
+        if (idRows.length > 0) return sanitizeParticipant(idRows[0])
     }
 
     // 4. Fallback: Fuzzy normalization for variations like ZENI001, ZEN-I-1, ZEN_T_002
