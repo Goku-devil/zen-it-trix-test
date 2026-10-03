@@ -143,6 +143,8 @@ export default function FoodAdminPage() {
     const [torchOn, setTorchOn] = useState(false)
     const [torchSupported, setTorchSupported] = useState(false)
     const [mobileTab, setMobileTab] = useState('scanner') // 'scanner' | 'search' | 'log'
+    const [showModal, setShowModal] = useState(false)
+    const [justPurchased, setJustPurchased] = useState(false)
 
     // Data lists
     const [foodRecords, setFoodRecords] = useState([])
@@ -390,11 +392,33 @@ export default function FoodAdminPage() {
         }
     }
 
+    const closeModal = () => {
+        setShowModal(false)
+        setCurrentLookup(null)
+        setJustPurchased(false)
+        if (inputRef.current && window.innerWidth > 768) {
+            inputRef.current.focus()
+        }
+    }
+
+    // Close popup on Escape
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                closeModal()
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [])
+
     const logout = () => {
         sessionStorage.removeItem('zen-food-admin-token')
         sessionStorage.removeItem('zen-admin-token')
         setToken('')
         setCurrentLookup(null)
+        setShowModal(false)
+        setJustPurchased(false)
     }
 
     // Record food purchase
@@ -421,6 +445,8 @@ export default function FoodAdminPage() {
             // Refresh lookup with new purchase info
             const updated = await request(`/food/lookup/${encodeURIComponent(passCode)}`)
             setCurrentLookup(updated)
+            setJustPurchased(true)
+            setShowModal(true)
             loadRecordsAndStats()
             setNotes('')
         } catch (error) {
@@ -450,6 +476,8 @@ export default function FoodAdminPage() {
         try {
             const data = await request(`/food/lookup/${encodeURIComponent(clean)}`)
             setCurrentLookup(data)
+            setJustPurchased(false)
+            setShowModal(true)
 
             if (data.alreadyBought) {
                 if (audioEnabled) sound.playWarning()
@@ -472,6 +500,7 @@ export default function FoodAdminPage() {
         } catch (error) {
             if (audioEnabled) sound.playError()
             setCurrentLookup(null)
+            setShowModal(false)
             setStatus({ type: 'error', message: error.message || `Pass code "${clean}" not recognized.` })
         } finally {
             setIsSearching(false)
@@ -1222,6 +1251,194 @@ export default function FoodAdminPage() {
                     </div>
                 </div>
             </section>
+
+            {/* Scan Success / Result Modal Popup */}
+            {showModal && currentLookup && (
+                <div
+                    className="food-modal-backdrop"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closeModal()
+                    }}
+                >
+                    <div className={`food-modal-card ${currentLookup.alreadyBought ? 'status-already-bought' : 'status-fresh'}`}>
+                        {/* Modal Header */}
+                        <div className="modal-header-bar">
+                            <div className="modal-header-title">
+                                <span className="modal-header-icon">
+                                    {justPurchased ? '🎉' : currentLookup.alreadyBought ? '⚠️' : '✅'}
+                                </span>
+                                <div>
+                                    <h2 className="modal-title">
+                                        {justPurchased
+                                            ? 'MEAL RECORDED!'
+                                            : currentLookup.alreadyBought
+                                            ? 'FOOD ALREADY BOUGHT!'
+                                            : 'ELIGIBLE FOR FOOD'}
+                                    </h2>
+                                    <span className="modal-subtitle">
+                                        {justPurchased
+                                            ? 'Meal token saved in live log'
+                                            : currentLookup.alreadyBought
+                                            ? `Already claimed at ${formatDateTime(currentLookup.lastBoughtAt)} (${getRelativeTime(currentLookup.lastBoughtAt)})`
+                                            : 'Eligible participant · Ready to issue token'}
+                                    </span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                className="modal-close-icon-btn"
+                                onClick={closeModal}
+                                title="Close Popup (Esc)"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="modal-body-content">
+                            {justPurchased ? (
+                                <div className="modal-success-state">
+                                    <div className="success-pulse-circle">✓</div>
+                                    <h3 className="success-name">{currentLookup.participant.participantName}</h3>
+                                    <p className="success-meta">
+                                        {currentLookup.participant.passCode} · {currentLookup.participant.college || 'Annapoorana Engineering College'}
+                                    </p>
+                                    <div className="success-meal-pill">
+                                        🍱 {foodType} Issued Successfully
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="modal-next-btn-large"
+                                        onClick={closeModal}
+                                        autoFocus
+                                    >
+                                        Scan Next Participant →
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Student Info Card */}
+                                    <div className="modal-student-info">
+                                        <div className="modal-info-hero">
+                                            <span className="modal-info-label">PARTICIPANT NAME</span>
+                                            <h3 className="modal-participant-name">
+                                                {currentLookup.participant.participantName}
+                                            </h3>
+                                            <div className="modal-badges-row">
+                                                <span className="modal-pass-pill">{currentLookup.participant.passCode}</span>
+                                                <span className="modal-type-pill">
+                                                    {currentLookup.participant.registrationType === 'team'
+                                                        ? `Team: ${currentLookup.participant.teamName || 'Pass'}`
+                                                        : 'Individual'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="modal-info-meta-grid">
+                                            <div className="modal-meta-cell">
+                                                <span className="meta-cell-label">College</span>
+                                                <strong className="meta-cell-val">{currentLookup.participant.college || '—'}</strong>
+                                            </div>
+                                            <div className="modal-meta-cell">
+                                                <span className="meta-cell-label">Event</span>
+                                                <strong className="meta-cell-val">{currentLookup.participant.eventName || '—'}</strong>
+                                            </div>
+                                            <div className="modal-meta-cell">
+                                                <span className="meta-cell-label">Contact</span>
+                                                <strong className="meta-cell-val">{currentLookup.participant.phone || currentLookup.participant.email || '—'}</strong>
+                                            </div>
+                                            <div className="modal-meta-cell">
+                                                <span className="meta-cell-label">Year of Study</span>
+                                                <strong className="meta-cell-val">{currentLookup.participant.yearOfStudy || '—'}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Past Purchase Details (if already claimed) */}
+                                    {currentLookup.alreadyBought && currentLookup.purchases?.length > 0 && (
+                                        <div className="modal-timestamps-card">
+                                            <div className="modal-timestamps-head">
+                                                <span>🕒 Past Meal Claims ({currentLookup.purchaseCount} Token{currentLookup.purchaseCount === 1 ? '' : 's'})</span>
+                                            </div>
+                                            <div className="modal-timestamps-list">
+                                                {currentLookup.purchases.map((p, idx) => (
+                                                    <div key={p.id || idx} className="modal-timestamp-item">
+                                                        <div className="modal-ts-left">
+                                                            <strong className="modal-ts-time">{formatDateTime(p.boughtAt)}</strong>
+                                                            <span className="modal-ts-rel">({getRelativeTime(p.boughtAt)})</span>
+                                                        </div>
+                                                        <span className="modal-ts-tag">{p.foodType}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Meal Selection Selector */}
+                                    <div className="modal-meal-controls">
+                                        <label className="modal-meal-label">
+                                            <span>Meal Type:</span>
+                                            <select
+                                                value={foodType}
+                                                onChange={(e) => setFoodType(e.target.value)}
+                                                className="modal-meal-select"
+                                            >
+                                                <option value="Standard Lunch">Standard Lunch</option>
+                                                <option value="Veg Lunch Meal">Veg Lunch Meal</option>
+                                                <option value="Non-Veg Lunch Meal">Non-Veg Lunch Meal</option>
+                                                <option value="Snack & Refreshment">Snack & Refreshment</option>
+                                                <option value="Dinner Meal">Dinner Meal</option>
+                                            </select>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Optional note / counter ID..."
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            className="modal-notes-input"
+                                        />
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="modal-actions-bar">
+                                        {!currentLookup.alreadyBought ? (
+                                            <button
+                                                type="button"
+                                                className="modal-action-btn btn-confirm"
+                                                disabled={isPurchasing}
+                                                onClick={() => recordFoodPurchase(currentLookup.participant.passCode, false)}
+                                            >
+                                                {isPurchasing ? 'Recording...' : '🍱 Confirm & Mark as Bought'}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="modal-action-btn btn-override"
+                                                disabled={isPurchasing}
+                                                onClick={() => {
+                                                    if (window.confirm(`Participant already bought food at ${formatDateTime(currentLookup.lastBoughtAt)}. Are you sure you want to issue an extra token?`)) {
+                                                        recordFoodPurchase(currentLookup.participant.passCode, true)
+                                                    }
+                                                }}
+                                            >
+                                                {isPurchasing ? 'Recording...' : '⚠️ Issue Additional Meal (Override)'}
+                                            </button>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            className="modal-action-btn btn-dismiss"
+                                            onClick={closeModal}
+                                        >
+                                            ✕ Close / Next Scan
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     )
 }
