@@ -26,28 +26,56 @@ const parseDbConfig = () => {
     let user = process.env.DB_USER || 'zen_it_trix_db'
     let password = process.env.DB_PASSWORD || 'root'
     let database = process.env.DB_NAME || 'zen_it_trix'
+    let sslModeDetected = false
 
     if (process.env.DATABASE_URL) {
-        try {
-            const dbUrl = new URL(process.env.DATABASE_URL)
-            host = dbUrl.hostname || host
-            port = dbUrl.port ? Number(dbUrl.port) : port
-            user = dbUrl.username ? decodeURIComponent(dbUrl.username) : user
-            password = dbUrl.password ? decodeURIComponent(dbUrl.password) : password
-            database = dbUrl.pathname.replace(/^\//, '') || database
-        } catch (err) {
-            console.warn('Failed to parse DATABASE_URL, falling back to individual env variables.', err.message)
+        const rawUri = String(process.env.DATABASE_URL).trim().replace(/^["']|["']$/g, '')
+        // Regex match for URI to safely handle special characters (#, @, etc.) in passwords
+        const match = rawUri.match(/^(?:mysql|mariadb):\/\/([^:]+):(.+)@([^:/]+)(?::(\d+))?(?:\/([^?]*))?(?:\?(.*))?$/)
+        if (match) {
+            user = decodeURIComponent(match[1])
+            password = decodeURIComponent(match[2])
+            host = match[3]
+            port = match[4] ? Number(match[4]) : 3306
+            database = match[5] || 'defaultdb'
+            if (match[6] && match[6].includes('ssl-mode=')) {
+                sslModeDetected = true
+            }
+        } else {
+            try {
+                const dbUrl = new URL(rawUri)
+                host = dbUrl.hostname || host
+                port = dbUrl.port ? Number(dbUrl.port) : port
+                user = dbUrl.username ? decodeURIComponent(dbUrl.username) : user
+                password = dbUrl.password ? decodeURIComponent(dbUrl.password) : password
+                database = dbUrl.pathname.replace(/^\//, '') || database
+                if (dbUrl.searchParams.has('ssl-mode')) {
+                    sslModeDetected = true
+                }
+            } catch (err) {
+                console.warn('Failed to parse DATABASE_URL, falling back to individual env variables.', err.message)
+            }
         }
+    }
+
+    const isLocal = host === 'localhost' || host === '127.0.0.1'
+
+    if ((process.env.NODE_ENV === 'production' || process.env.RENDER) && isLocal) {
+        console.error('⚠️ [CRITICAL CONFIG ERROR] Database host is configured as "localhost" in production!')
+        console.error('⚠️ Please add DATABASE_URL in your Render dashboard (Settings -> Environment) with your Aiven MySQL Service URI.')
     }
 
     const useSsl =
         process.env.DB_SSL === 'true' ||
         process.env.DB_SSL === '1' ||
-        (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('ssl-mode='))
+        sslModeDetected ||
+        (!isLocal && !process.env.DB_SSL)
 
     const sslConfig = useSsl
         ? (process.env.DB_CA_CERT ? { ca: process.env.DB_CA_CERT, rejectUnauthorized: true } : { rejectUnauthorized: false })
         : undefined
+
+    console.log(`[Database] Connecting to host: "${host}", port: ${port}, database: "${database}", user: "${user}", ssl: ${Boolean(sslConfig)}`)
 
     return {
         host,
@@ -56,11 +84,16 @@ const parseDbConfig = () => {
         password,
         database,
         connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
+        connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT || 15000), // 15 seconds (default was only 1000ms)
+        acquireTimeout: Number(process.env.DB_ACQUIRE_TIMEOUT || 20000),
         ...(sslConfig ? { ssl: sslConfig } : {}),
     }
 }
 
 const pool = mariadb.createPool(parseDbConfig())
+pool.on('error', (err) => {
+    console.error('[Database Pool Error]:', err.code, err.message)
+})
 
 const configuredOrigins = (process.env.FRONTEND_ORIGIN || '')
     .split(',')
@@ -1134,9 +1167,27 @@ app.get('/api/food/search-participants', requireAdmin, async (request, response)
 
 app.use((_request, response) => response.status(404).json({ message: 'Route not found.' }))
 
-ensureSchema()
-    .then(() => app.listen(port, '0.0.0.0', () => console.log(`Zen-it-trix API listening on port ${port}`)))
-    .catch((error) => {
-        console.error('Could not prepare database schema.', error)
-        process.exitCode = 1
-    })
+const initServer = async () => {
+    const maxRetries = 10
+    const delayMs = 3000
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[Database] Connecting and verifying schema (attempt ${attempt}/${maxRetries})...`)
+            await ensureSchema()
+            console.log('[Database] Schema verification succeeded.')
+            app.listen(port, '0.0.0.0', () => console.log(`Zen-it-trix API listening on port ${port}`))
+            return
+        } catch (error) {
+            console.error(`[Database] Connection attempt ${attempt} failed:`, error.message || error)
+            if (attempt < maxRetries) {
+                console.log(`[Database] Retrying in ${delayMs / 1000} seconds...`)
+                await new Promise((res) => setTimeout(res, delayMs))
+            } else {
+                console.error('[Database] Failed to connect to database after multiple retries. Exiting.')
+                process.exitCode = 1
+            }
+        }
+    }
+}
+
+initServer()
