@@ -5843,14 +5843,15 @@ footer h2 {
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: rgba(10, 7, 20, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(10, 7, 20, 0.82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
-    animation: modalBackdropFadeIn .2s ease-out;
+    animation: modalBackdropFadeIn .12s ease-out;
+    will-change: opacity;
 }
 
 @keyframes modalBackdropFadeIn {
@@ -5867,7 +5868,9 @@ footer h2 {
     border: 2px solid var(--line);
     border-radius: 12px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 32px rgba(213, 255, 75, 0.15);
-    animation: modalCardPopIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modalCardPopIn .14s cubic-bezier(0, 0, 0.2, 1);
+    transform: translateZ(0);
+    will-change: transform, opacity;
     display: flex;
     flex-direction: column;
 }
@@ -5875,7 +5878,7 @@ footer h2 {
 @keyframes modalCardPopIn {
     from {
         opacity: 0;
-        transform: scale(0.92) translateY(16px);
+        transform: scale(0.95) translateY(8px);
     }
     to {
         opacity: 1;
@@ -5891,6 +5894,52 @@ footer h2 {
 .food-modal-card.status-already-bought {
     border-color: #ffb703;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 36px rgba(255, 183, 3, 0.25);
+}
+
+.food-modal-card.status-loading {
+    border-color: rgba(213, 255, 75, 0.4);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(213, 255, 75, 0.15);
+}
+
+.modal-loading-state {
+    padding: 38px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+}
+
+.modal-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(213, 255, 75, 0.2);
+    border-top-color: var(--lime);
+    border-radius: 50%;
+    animation: spinModal .55s linear infinite;
+    margin-bottom: 4px;
+}
+
+@keyframes spinModal {
+    to { transform: rotate(360deg); }
+}
+
+.modal-loading-code {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    background: rgba(213, 255, 75, 0.12);
+    border: 1px solid rgba(213, 255, 75, 0.35);
+    color: var(--lime);
+    font: 700 13px 'DM Mono', monospace;
+    letter-spacing: .04em;
+}
+
+.modal-loading-hint {
+    margin: 0;
+    font: 500 12px 'DM Mono', monospace;
+    color: var(--muted);
 }
 
 /* Modal Header Bar */

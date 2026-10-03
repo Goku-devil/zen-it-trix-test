@@ -280,6 +280,12 @@ const ensureSchema = async () => {
         // Best effort column modify
     }
 
+    try {
+        await pool.query('ALTER TABLE registrations ADD INDEX idx_reg_pass_code (pass_code)')
+    } catch {
+        // Index already exists or best effort
+    }
+
     await pool.query(`
         CREATE TABLE IF NOT EXISTS team_members (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -294,6 +300,11 @@ const ensureSchema = async () => {
         )
     `)
     await ensureColumn('team_members', 'pass_code', 'VARCHAR(30) NULL DEFAULT NULL')
+    try {
+        await pool.query('ALTER TABLE team_members ADD INDEX idx_tm_pass_code (pass_code)')
+    } catch {
+        // Index already exists or best effort
+    }
 
     await pool.query(`
         CREATE TABLE IF NOT EXISTS pass_counters (

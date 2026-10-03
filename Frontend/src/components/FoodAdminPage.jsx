@@ -144,6 +144,8 @@ export default function FoodAdminPage() {
     const [mobileTab, setMobileTab] = useState('scanner') // 'scanner' | 'search' | 'log'
     const [showModal, setShowModal] = useState(false)
     const [justPurchased, setJustPurchased] = useState(false)
+    const [modalLoading, setModalLoading] = useState(false)
+    const [activeLookupCode, setActiveLookupCode] = useState('')
 
     // Data lists
     const [foodRecords, setFoodRecords] = useState([])
@@ -166,6 +168,7 @@ export default function FoodAdminPage() {
     const inputRef = useRef(null)
     const handleBarcodeScannedRef = useRef(null)
     const lastScannedRef = useRef({ code: '', time: 0 })
+    const lookupCacheRef = useRef(new Map())
 
     // Persist settings
     useEffect(() => {
@@ -195,6 +198,32 @@ export default function FoodAdminPage() {
             ])
             setFoodRecords(recordsData)
             setStats(statsData)
+
+            // Pre-seed lookup cache with participants from food records
+            if (Array.isArray(recordsData)) {
+                recordsData.forEach((r) => {
+                    if (r.passCode) {
+                        const codeUpper = r.passCode.toUpperCase()
+                        if (!lookupCacheRef.current.has(codeUpper)) {
+                            lookupCacheRef.current.set(codeUpper, {
+                                found: true,
+                                participant: {
+                                    participantName: r.participantName,
+                                    passCode: r.passCode,
+                                    college: r.college,
+                                    phone: r.phone,
+                                    registrationType: 'individual',
+                                    eventName: 'Symposium',
+                                },
+                                alreadyBought: true,
+                                purchaseCount: 1,
+                                purchases: [r],
+                                lastBoughtAt: r.boughtAt,
+                            })
+                        }
+                    }
+                })
+            }
         } catch (error) {
             console.error('Failed to load food data:', error)
         }
@@ -268,7 +297,7 @@ export default function FoodAdminPage() {
 
             // Barcode passes are wide horizontal strips: narrow height scan box cuts CPU decoding pixels by 60%!
             const config = {
-                fps: 25,
+                fps: 15,
                 qrbox: (viewfinderWidth, viewfinderHeight) => ({
                     width: Math.min(Math.floor(viewfinderWidth * 0.90), 380),
                     height: Math.min(Math.floor(viewfinderHeight * 0.42), 170),
@@ -395,6 +424,7 @@ export default function FoodAdminPage() {
         setShowModal(false)
         setCurrentLookup(null)
         setJustPurchased(false)
+        setModalLoading(false)
         if (inputRef.current && window.innerWidth > 768) {
             inputRef.current.focus()
         }
@@ -418,6 +448,7 @@ export default function FoodAdminPage() {
         setCurrentLookup(null)
         setShowModal(false)
         setJustPurchased(false)
+        setModalLoading(false)
     }
 
     // Record food purchase
@@ -430,7 +461,7 @@ export default function FoodAdminPage() {
                 body: JSON.stringify({
                     passCode,
                     foodType,
-                    notes,
+                    notes: notes.trim() || undefined,
                     force,
                 }),
             })
@@ -441,11 +472,22 @@ export default function FoodAdminPage() {
                 message: `Food recorded for ${result.participant.participantName}! (${formatDateTime(result.purchase.boughtAt)})`,
             })
 
-            // Refresh lookup with new purchase info
-            const updated = await request(`/food/lookup/${encodeURIComponent(passCode)}`)
+            // Construct updated lookup instantly without redundant network roundtrip!
+            const upperCode = passCode.toUpperCase()
+            const prevPurchases = currentLookup?.purchases || []
+            const updated = {
+                found: true,
+                participant: result.participant,
+                alreadyBought: true,
+                purchaseCount: prevPurchases.length + 1,
+                purchases: [result.purchase, ...prevPurchases],
+                lastBoughtAt: result.purchase.boughtAt,
+            }
+            lookupCacheRef.current.set(upperCode, updated)
             setCurrentLookup(updated)
             setJustPurchased(true)
             setShowModal(true)
+            setModalLoading(false)
             loadRecordsAndStats()
             setNotes('')
         } catch (error) {
@@ -468,24 +510,46 @@ export default function FoodAdminPage() {
             clean = urlMatch[1]
         }
 
+        const upperCode = clean.toUpperCase()
+        setActiveLookupCode(clean)
         setIsSearching(true)
         setStatus({ type: '', message: '' })
         setMobileTab('scanner') // switch to scanner tab on mobile so volunteer sees results immediately
 
+        // 1. Instant cache hit check (0ms display!)
+        const cached = lookupCacheRef.current.get(upperCode)
+        if (cached) {
+            setCurrentLookup(cached)
+            setJustPurchased(false)
+            setModalLoading(false)
+            setShowModal(true)
+            if (cached.alreadyBought) {
+                if (audioEnabled) sound.playWarning()
+            } else {
+                if (audioEnabled) sound.playSuccess()
+            }
+        } else {
+            // Open modal IMMEDIATELY in loading state (0ms display!)
+            setCurrentLookup(null)
+            setJustPurchased(false)
+            setModalLoading(true)
+            setShowModal(true)
+        }
+
         try {
             const data = await request(`/food/lookup/${encodeURIComponent(clean)}`)
+            lookupCacheRef.current.set(upperCode, data)
             setCurrentLookup(data)
-            setJustPurchased(false)
-            setShowModal(true)
+            setModalLoading(false)
 
             if (data.alreadyBought) {
-                if (audioEnabled) sound.playWarning()
+                if (audioEnabled && !cached) sound.playWarning()
                 setStatus({
                     type: 'warning',
                     message: `Food ALREADY bought by ${data.participant.participantName} at ${formatDateTime(data.lastBoughtAt)}!`,
                 })
             } else {
-                if (audioEnabled) sound.playSuccess()
+                if (audioEnabled && !cached) sound.playSuccess()
                 setStatus({
                     type: 'success',
                     message: `Found eligible participant: ${data.participant.participantName} (${data.participant.passCode})`,
@@ -498,11 +562,14 @@ export default function FoodAdminPage() {
             }
         } catch (error) {
             if (audioEnabled) sound.playError()
-            setCurrentLookup(null)
-            setShowModal(false)
+            if (!cached) {
+                setShowModal(false)
+                setCurrentLookup(null)
+            }
             setStatus({ type: 'error', message: error.message || `Pass code "${clean}" not recognized.` })
         } finally {
             setIsSearching(false)
+            setModalLoading(false)
             setPassCodeInput('')
             if (inputRef.current && window.innerWidth > 768) inputRef.current.focus()
         }
@@ -1268,16 +1335,48 @@ export default function FoodAdminPage() {
             </section>
 
             {/* Scan Success / Result Modal Popup */}
-            {showModal && currentLookup && (
+            {showModal && (
                 <div
                     className="food-modal-backdrop"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) closeModal()
                     }}
                 >
-                    <div className={`food-modal-card ${currentLookup.alreadyBought ? 'status-already-bought' : 'status-fresh'}`}>
-                        {/* Modal Header */}
-                        <div className="modal-header-bar">
+                    <div className={`food-modal-card ${modalLoading && !currentLookup ? 'status-loading' : currentLookup?.alreadyBought ? 'status-already-bought' : 'status-fresh'}`}>
+                        {modalLoading && !currentLookup ? (
+                            <>
+                                <div className="modal-header-bar">
+                                    <div className="modal-header-title">
+                                        <span className="modal-header-icon" aria-hidden="true">
+                                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <polyline points="12 6 12 12 14 14"/>
+                                            </svg>
+                                        </span>
+                                        <div>
+                                            <h2 className="modal-title">LOOKING UP PASS...</h2>
+                                            <span className="modal-subtitle">Checking live student database</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="modal-close-icon-btn"
+                                        onClick={closeModal}
+                                        title="Close Popup (Esc)"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                                <div className="modal-loading-state">
+                                    <div className="modal-loading-spinner"></div>
+                                    <span className="modal-loading-code">{activeLookupCode || 'Checking...'}</span>
+                                    <p className="modal-loading-hint">Fetching participant eligibility and meal history...</p>
+                                </div>
+                            </>
+                        ) : currentLookup ? (
+                            <>
+                                {/* Modal Header */}
+                                <div className="modal-header-bar">
                             <div className="modal-header-title">
                                 <span className="modal-header-icon" aria-hidden="true">
                                     {justPurchased ? (
@@ -1465,9 +1564,11 @@ export default function FoodAdminPage() {
                                 </>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                ) : null}
+            </div>
+        </div>
+    )}
         </main>
     )
 }
