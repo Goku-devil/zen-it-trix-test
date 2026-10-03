@@ -35,7 +35,6 @@ function App() {
     if (hash === '#food-admin' || hash === '#food') {
         return (
             <main className={`theme-${theme}`}>
-                <AnimatedOverlay />
                 <SiteNav isAdmin={true} isFoodAdmin={true} />
                 <FoodAdminPage />
                 <Footer theme={theme} onThemeChange={setTheme} />

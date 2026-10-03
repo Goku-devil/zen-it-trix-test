@@ -139,6 +139,9 @@ export default function FoodAdminPage() {
     const [autoMarkOnScan, setAutoMarkOnScan] = useState(() => localStorage.getItem('zen-food-automark') === 'true')
     const [audioEnabled, setAudioEnabled] = useState(() => localStorage.getItem('zen-food-audio') !== 'false')
     const [cameraActive, setCameraActive] = useState(false)
+    const [torchOn, setTorchOn] = useState(false)
+    const [torchSupported, setTorchSupported] = useState(false)
+    const [mobileTab, setMobileTab] = useState('scanner') // 'scanner' | 'search' | 'log'
 
     // Data lists
     const [foodRecords, setFoodRecords] = useState([])
@@ -160,6 +163,7 @@ export default function FoodAdminPage() {
     const scannerRef = useRef(null)
     const inputRef = useRef(null)
     const handleBarcodeScannedRef = useRef(null)
+    const lastScannedRef = useRef({ code: '', time: 0 })
 
     // Persist settings
     useEffect(() => {
@@ -202,12 +206,26 @@ export default function FoodAdminPage() {
         }
     }, [token])
 
-    // Focus input on mount
+    // Focus input on mount (Desktop only to prevent virtual keyboard from pushing scanner off screen on mobile)
     useEffect(() => {
-        if (token && inputRef.current) {
+        if (token && inputRef.current && window.innerWidth > 768) {
             inputRef.current.focus()
         }
     }, [token])
+
+    // Toggle flashlight / torch on mobile
+    const toggleTorch = async () => {
+        if (!scannerRef.current) return
+        try {
+            const next = !torchOn
+            await scannerRef.current.applyVideoConstraints({
+                advanced: [{ torch: next }],
+            })
+            setTorchOn(next)
+        } catch (err) {
+            console.warn('Torch toggle error:', err)
+        }
+    }
 
     // Camera Scanner Lifecycle using html5-qrcode
     useEffect(() => {
@@ -230,22 +248,47 @@ export default function FoodAdminPage() {
                         Html5QrcodeSupportedFormats.UPC_A,
                     ]
 
-                    html5QrCode = new Html5Qrcode(qrCodeRegionId, { formatsToSupport, verbose: false })
+                    // Native hardware BarcodeDetector (backed by Play Services on Android / Vision on iOS)
+                    html5QrCode = new Html5Qrcode(qrCodeRegionId, {
+                        formatsToSupport,
+                        verbose: false,
+                        experimentalFeatures: {
+                            useBarCodeDetectorIfSupported: true,
+                        },
+                    })
                     scannerRef.current = html5QrCode
 
+                    // Barcode passes are wide horizontal strips: narrow height scan box cuts CPU decoding pixels by 60%!
                     const config = {
-                        fps: 15,
+                        fps: 25,
                         qrbox: (viewfinderWidth, viewfinderHeight) => ({
-                            width: Math.min(Math.floor(viewfinderWidth * 0.85), 320),
-                            height: Math.min(Math.floor(viewfinderHeight * 0.55), 180),
+                            width: Math.min(Math.floor(viewfinderWidth * 0.90), 380),
+                            height: Math.min(Math.floor(viewfinderHeight * 0.42), 170),
                         }),
-                        aspectRatio: 1.777778,
+                        aspectRatio: 1.333333,
+                        videoConstraints: {
+                            facingMode: { ideal: 'environment' },
+                            width: { min: 640, ideal: 1280, max: 1920 },
+                            height: { min: 480, ideal: 720, max: 1080 },
+                            focusMode: 'continuous',
+                        },
                     }
 
                     const onScanSuccess = (decodedText) => {
-                        if (decodedText) {
-                            handleBarcodeScannedRef.current?.(decodedText)
+                        if (!decodedText) return
+                        const now = Date.now()
+                        // Debounce repeat scans of the same pass within 2.5s
+                        if (lastScannedRef.current.code === decodedText && now - lastScannedRef.current.time < 2500) {
+                            return
                         }
+                        lastScannedRef.current = { code: decodedText, time: now }
+
+                        // Instant haptic feedback for physical scanner feel
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            try { navigator.vibrate(80) } catch {}
+                        }
+
+                        handleBarcodeScannedRef.current?.(decodedText)
                     }
 
                     try {
@@ -261,6 +304,22 @@ export default function FoodAdminPage() {
                                 return html5QrCode.start(true, config, onScanSuccess, () => {})
                             })
                         })
+
+                        // Check if torch / flashlight is supported
+                        try {
+                            const caps = html5QrCode.getRunningTrackCameraCapabilities?.()
+                            if (caps?.torchFeature?.()?.isSupported?.()) {
+                                setTorchSupported(true)
+                            } else {
+                                const videoEl = el.querySelector('video')
+                                const track = videoEl?.srcObject?.getVideoTracks?.()?.[0]
+                                if (track?.getCapabilities?.()?.torch) {
+                                    setTorchSupported(true)
+                                }
+                            }
+                        } catch {
+                            // Capability check fallback
+                        }
                     } catch (err) {
                         if (isCancelled) return
                         console.error('Camera start error:', err)
@@ -283,6 +342,8 @@ export default function FoodAdminPage() {
 
         return () => {
             isCancelled = true
+            setTorchOn(false)
+            setTorchSupported(false)
             if (scannerRef.current) {
                 scannerRef.current
                     .stop()
@@ -351,7 +412,7 @@ export default function FoodAdminPage() {
             setStatus({ type: 'error', message: error.message || 'Could not record food purchase.' })
         } finally {
             setIsPurchasing(false)
-            if (inputRef.current) inputRef.current.focus()
+            if (inputRef.current && window.innerWidth > 768) inputRef.current.focus()
         }
     }
 
@@ -368,6 +429,7 @@ export default function FoodAdminPage() {
 
         setIsSearching(true)
         setStatus({ type: '', message: '' })
+        setMobileTab('scanner') // switch to scanner tab on mobile so volunteer sees results immediately
 
         try {
             const data = await request(`/food/lookup/${encodeURIComponent(clean)}`)
@@ -398,7 +460,7 @@ export default function FoodAdminPage() {
         } finally {
             setIsSearching(false)
             setPassCodeInput('')
-            if (inputRef.current) inputRef.current.focus()
+            if (inputRef.current && window.innerWidth > 768) inputRef.current.focus()
         }
     }
 
@@ -575,8 +637,53 @@ export default function FoodAdminPage() {
                 </div>
             </header>
 
-            {/* KPI Stats Grid */}
-            <section className="food-stats-grid">
+            {/* Mobile Quick Stats Summary Bar */}
+            <div className="food-mobile-stat-bar">
+                <div className="mobile-stat-pill">
+                    <span className="stat-pill-label">🍱 Served</span>
+                    <strong className="stat-pill-val text-lime">{stats.uniqueParticipantsServed}</strong>
+                    <span className="stat-pill-denom">/{stats.totalEligible}</span>
+                </div>
+                <div className="mobile-stat-pill">
+                    <span className="stat-pill-label">⏳ Pending</span>
+                    <strong className="stat-pill-val text-amber">{stats.pending}</strong>
+                </div>
+                <div className="mobile-stat-pill">
+                    <span className="stat-pill-label">⚡ Last Hr</span>
+                    <strong className="stat-pill-val text-cyan">{stats.servedInLastHour}</strong>
+                </div>
+            </div>
+
+            {/* Mobile Segmented Navigation Tabs */}
+            <nav className="food-mobile-tabs" aria-label="Food Admin Navigation">
+                <button
+                    type="button"
+                    className={`food-mobile-tab-btn ${mobileTab === 'scanner' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('scanner')}
+                >
+                    <span className="tab-btn-icon">📷</span>
+                    <span>Scanner</span>
+                </button>
+                <button
+                    type="button"
+                    className={`food-mobile-tab-btn ${mobileTab === 'search' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('search')}
+                >
+                    <span className="tab-btn-icon">🔍</span>
+                    <span>Search Student</span>
+                </button>
+                <button
+                    type="button"
+                    className={`food-mobile-tab-btn ${mobileTab === 'log' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('log')}
+                >
+                    <span className="tab-btn-icon">📋</span>
+                    <span>Food Log {foodRecords.length > 0 ? `(${foodRecords.length})` : ''}</span>
+                </button>
+            </nav>
+
+            {/* KPI Stats Grid (Visible on desktop; on mobile only inside the 'log' tab) */}
+            <section className={`food-stats-grid ${mobileTab !== 'log' ? 'hide-mobile' : ''}`}>
                 <div className="food-stat-card card-served">
                     <span className="food-stat-label">🍱 FOOD BOUGHT / SERVED</span>
                     <div className="food-stat-val text-lime">
@@ -608,7 +715,7 @@ export default function FoodAdminPage() {
             </section>
 
             {/* Scanner Controls Toolbar */}
-            <section className="food-scanner-toolbar">
+            <section className={`food-scanner-toolbar ${mobileTab !== 'scanner' ? 'hide-mobile' : ''}`}>
                 <div className="toolbar-left">
                     <button
                         type="button"
@@ -662,16 +769,66 @@ export default function FoodAdminPage() {
             {/* Main Interactive Scanner Grid */}
             <section className="food-main-layout">
                 {/* Left Column: Barcode Scanner & Result */}
-                <div className="food-scanner-column">
+                <div className={`food-scanner-column ${mobileTab !== 'scanner' ? 'hide-mobile' : ''}`}>
+                    {/* Big Launch Button on Mobile when camera is off */}
+                    {!cameraActive && (
+                        <button
+                            type="button"
+                            className="food-open-camera-hero-btn"
+                            onClick={() => setCameraActive(true)}
+                        >
+                            <span className="hero-btn-icon">📷</span>
+                            <div className="hero-btn-text">
+                                <strong>Open Camera Scanner</strong>
+                                <span>Tap to scan Code 128 / QR badge instantly</span>
+                            </div>
+                            <span className="hero-btn-badge">FAST SCAN</span>
+                        </button>
+                    )}
+
                     {/* Camera Video Stream (conditionally visible) */}
                     {cameraActive && (
                         <div className="food-camera-card">
                             <div className="camera-header">
-                                <span>LIVE CAMERA BARCODE SCANNER</span>
-                                <span className="camera-badge">Point at Code128 or QR</span>
+                                <div className="camera-header-title">
+                                    <span className="camera-pulse-dot"></span>
+                                    <span>LIVE CAMERA SCANNER</span>
+                                </div>
+                                <div className="camera-header-tools">
+                                    {torchSupported && (
+                                        <button
+                                            type="button"
+                                            className={`camera-tool-btn ${torchOn ? 'active' : ''}`}
+                                            onClick={toggleTorch}
+                                            title="Toggle Flashlight"
+                                        >
+                                            {torchOn ? '🔦 Flashlight ON' : '💡 Flashlight'}
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="camera-tool-btn close-btn"
+                                        onClick={() => setCameraActive(false)}
+                                    >
+                                        ✕ Close
+                                    </button>
+                                </div>
                             </div>
-                            <div id="reader-food-camera" className="camera-viewport"></div>
-                            <p className="camera-hint">Hold the participant's pass barcode steadily in front of the lens.</p>
+
+                            <div className="camera-viewport-container">
+                                <div id="reader-food-camera" className="camera-viewport"></div>
+                                <div className="camera-targeting-overlay">
+                                    <div className="target-corners">
+                                        <div className="c-corner c-tl"></div>
+                                        <div className="c-corner c-tr"></div>
+                                        <div className="c-corner c-bl"></div>
+                                        <div className="c-corner c-br"></div>
+                                    </div>
+                                    <div className="camera-laser-scan-line"></div>
+                                    <span className="camera-target-hint">Hold barcode horizontally inside the box</span>
+                                </div>
+                            </div>
+                            <p className="camera-hint">⚡ Hardware-accelerated scanning enabled</p>
                         </div>
                     )}
 
@@ -887,7 +1044,10 @@ export default function FoodAdminPage() {
                                     <button
                                         type="button"
                                         className="action-clear-btn"
-                                        onClick={() => { setCurrentLookup(null); inputRef.current?.focus() }}
+                                        onClick={() => {
+                                            setCurrentLookup(null)
+                                            if (inputRef.current && window.innerWidth > 768) inputRef.current.focus()
+                                        }}
                                     >
                                         Clear / Next Scan
                                     </button>
@@ -909,7 +1069,7 @@ export default function FoodAdminPage() {
                 {/* Right Column: Participant Search & Live Food Log */}
                 <div className="food-side-column">
                     {/* Manual Search Card (For students without barcode) */}
-                    <div className="food-manual-search-card">
+                    <div className={`food-manual-search-card ${mobileTab !== 'search' ? 'hide-mobile' : ''}`}>
                         <div className="manual-search-header">
                             <span>🔍 LOST BARCODE? SEARCH PARTICIPANT</span>
                         </div>
@@ -931,6 +1091,7 @@ export default function FoodAdminPage() {
                                             handleBarcodeScanned(p.passCode)
                                             setManualSearchQuery('')
                                             setManualSearchResults([])
+                                            setMobileTab('scanner')
                                         }}
                                     >
                                         <div className="manual-row-info">
@@ -945,7 +1106,7 @@ export default function FoodAdminPage() {
                     </div>
 
                     {/* Live Purchases History Log */}
-                    <div className="food-history-card">
+                    <div className={`food-history-card ${mobileTab !== 'log' ? 'hide-mobile' : ''}`}>
                         <div className="history-header">
                             <div>
                                 <span className="history-eyebrow">LIVE LOG</span>
@@ -1002,7 +1163,10 @@ export default function FoodAdminPage() {
                                                     <button
                                                         type="button"
                                                         className="history-pass-btn"
-                                                        onClick={() => handleBarcodeScanned(record.passCode)}
+                                                        onClick={() => {
+                                                            handleBarcodeScanned(record.passCode)
+                                                            setMobileTab('scanner')
+                                                        }}
                                                         title="Lookup this participant"
                                                     >
                                                         {record.passCode}

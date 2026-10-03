@@ -5361,3 +5361,450 @@ footer h2 {
     opacity: 1;
     background: rgba(255, 79, 154, .15);
 }
+
+/* ==========================================================================
+   Food Admin Mobile Optimization & High-Performance Scanner Styles
+   ========================================================================== */
+
+/* Mobile Quick Stats Bar */
+.food-mobile-stat-bar {
+    display: none;
+}
+
+/* Mobile Segmented Navigation Tabs */
+.food-mobile-tabs {
+    display: none;
+}
+
+/* Open Camera Hero Button */
+.food-open-camera-hero-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(213, 255, 75, 0.14), rgba(0, 255, 102, 0.05));
+    border: 1.5px solid var(--lime);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all .2s ease;
+    box-shadow: 0 4px 18px rgba(213, 255, 75, 0.16);
+    margin-bottom: 4px;
+}
+
+.food-open-camera-hero-btn:hover,
+.food-open-camera-hero-btn:active {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(213, 255, 75, 0.28);
+    background: linear-gradient(135deg, rgba(213, 255, 75, 0.2), rgba(0, 255, 102, 0.08));
+}
+
+.hero-btn-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.hero-btn-text {
+    flex: 1;
+}
+
+.hero-btn-text strong {
+    display: block;
+    font: 700 15px 'Space Grotesk', sans-serif;
+    color: var(--ink);
+    margin-bottom: 2px;
+}
+
+.hero-btn-text span {
+    display: block;
+    font: 500 11px 'DM Mono', monospace;
+    color: var(--muted);
+}
+
+.hero-btn-badge {
+    font: 700 11px 'DM Mono', monospace;
+    background: var(--lime);
+    color: #100c1d;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: .06em;
+    flex-shrink: 0;
+}
+
+/* Camera Header & Tools */
+.camera-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font: 700 11px 'DM Mono', monospace;
+    color: var(--lime);
+    letter-spacing: .08em;
+}
+
+.camera-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff3366;
+    box-shadow: 0 0 8px #ff3366;
+    animation: pulseGlow 1.2s infinite;
+}
+
+.camera-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.camera-tool-btn {
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 5px 12px;
+    border-radius: 4px;
+    font: 600 11px 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.camera-tool-btn.active {
+    background: #ffd166;
+    color: #100c1d;
+    border-color: #ffd166;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(255, 209, 102, .4);
+}
+
+.camera-tool-btn.close-btn {
+    background: rgba(255, 79, 154, .15);
+    border-color: rgba(255, 79, 154, .4);
+    color: var(--pink);
+}
+
+.camera-tool-btn.close-btn:hover {
+    background: var(--pink);
+    color: #fff;
+}
+
+/* Camera Viewport & Targeting Overlay */
+.camera-viewport-container {
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+}
+
+.camera-targeting-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.target-corners {
+    position: absolute;
+    width: 88%;
+    height: 48%;
+    max-width: 380px;
+    border: 1px dashed rgba(213, 255, 75, .25);
+    border-radius: 8px;
+}
+
+.c-corner {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-color: var(--lime);
+    border-style: solid;
+}
+
+.c-tl {
+    top: -2px;
+    left: -2px;
+    border-width: 3px 0 0 3px;
+    border-top-left-radius: 6px;
+}
+
+.c-tr {
+    top: -2px;
+    right: -2px;
+    border-width: 3px 3px 0 0;
+    border-top-right-radius: 6px;
+}
+
+.c-bl {
+    bottom: -2px;
+    left: -2px;
+    border-width: 0 0 3px 3px;
+    border-bottom-left-radius: 6px;
+}
+
+.c-br {
+    bottom: -2px;
+    right: -2px;
+    border-width: 0 3px 3px 0;
+    border-bottom-right-radius: 6px;
+}
+
+/* High-tech scanning laser line */
+.camera-laser-scan-line {
+    position: absolute;
+    width: 86%;
+    max-width: 360px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #ff3366 20%, #00ff66 50%, #ff3366 80%, transparent 100%);
+    box-shadow: 0 0 8px #00ff66, 0 0 16px rgba(0, 255, 102, .5);
+    animation: laserScanSweep 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes laserScanSweep {
+    0% {
+        top: 28%;
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        top: 70%;
+        opacity: 0.8;
+    }
+}
+
+.camera-target-hint {
+    position: absolute;
+    bottom: 8px;
+    font: 600 10px 'DM Mono', monospace;
+    color: rgba(246, 242, 233, 0.9);
+    background: rgba(0, 0, 0, 0.65);
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: .04em;
+}
+
+/* Responsive Media Queries for Mobile Screens */
+@media (max-width: 850px) {
+    .food-admin-page {
+        padding: 12px 14px 60px;
+    }
+
+    .hide-mobile {
+        display: none !important;
+    }
+
+    /* Mobile Quick Stats Bar */
+    .food-mobile-stat-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        gap: 8px;
+        background: rgba(0, 0, 0, .4);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+    }
+
+    .mobile-stat-pill {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        font: 600 13px 'DM Mono', monospace;
+    }
+
+    .stat-pill-label {
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    .stat-pill-val {
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .stat-pill-denom {
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    /* Mobile Sticky Segmented Tabs */
+    .food-mobile-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        position: sticky;
+        top: 10px;
+        z-index: 50;
+        background: rgba(16, 12, 29, 0.96);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 5px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, .5);
+    }
+
+    .food-mobile-tab-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 10px 4px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font: 600 12px 'Space Grotesk', sans-serif;
+        cursor: pointer;
+        transition: all .15s ease;
+        white-space: nowrap;
+    }
+
+    .food-mobile-tab-btn.active {
+        background: var(--lime);
+        color: #100c1d;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(213, 255, 75, .3);
+    }
+
+    .tab-btn-icon {
+        font-size: 14px;
+    }
+
+    /* Header Compact on Mobile */
+    .food-admin-header {
+        padding-bottom: 14px;
+        margin-bottom: 14px;
+        gap: 12px;
+    }
+
+    .food-header-brand {
+        gap: 10px;
+    }
+
+    .food-brand-logo {
+        width: 36px;
+        height: 36px;
+    }
+
+    .food-college-logo {
+        height: 30px;
+    }
+
+    .food-title {
+        font-size: 20px;
+    }
+
+    .food-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .food-header-actions .food-btn {
+        padding: 8px 12px;
+        font-size: 11px;
+    }
+
+    /* Layout & Cards on Mobile */
+    .food-main-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .food-input-card {
+        padding: 14px;
+    }
+
+    .barcode-input-group {
+        padding: 6px 8px;
+        flex-wrap: wrap;
+    }
+
+    .barcode-input-group input {
+        font-size: 16px; /* Prevents auto-zoom in iOS Safari */
+        min-width: 140px;
+    }
+
+    .food-scan-submit-btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    /* Participant Details Grid: Single Column for Clean Readability */
+    .participant-details-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 0 14px;
+    }
+
+    .detail-name {
+        padding: 10px 12px;
+    }
+
+    .detail-value-highlight {
+        font-size: 18px;
+    }
+
+    .result-header-banner {
+        padding: 14px;
+    }
+
+    .banner-title {
+        font-size: 16px;
+    }
+
+    /* Buttons: Full Width Touch Targets */
+    .result-actions-panel {
+        padding: 14px;
+    }
+
+    .meal-type-selector {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .meal-type-selector select,
+    .meal-note-input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .result-buttons-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .action-confirm-buy-btn,
+    .action-override-buy-btn,
+    .action-clear-btn {
+        width: 100%;
+        min-height: 50px;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* History Table Scroll on Mobile */
+    .food-history-table th,
+    .food-history-table td {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    .food-history-card,
+    .food-manual-search-card {
+        padding: 14px;
+    }
+}
